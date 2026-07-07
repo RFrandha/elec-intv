@@ -28,7 +28,10 @@ go.work.sum
 .env
 
 # Editor/IDE
- .idea/
+.idea/
 # .vscode/
 
 /opt
+SETUP*.md
+*-keys.pdf
+*-keys.html
