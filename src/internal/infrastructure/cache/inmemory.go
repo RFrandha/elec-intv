@@ -12,9 +12,11 @@ type InMemory struct {
 	Config       *domain.PricingConfig
 	Events       []domain.Event
 	Tiers        map[string]*domain.Tier
+	ABTests      map[string]*domain.ABTestConfig
 	ConfigLoaded time.Time
 	EventsLoaded time.Time
 	TiersLoaded  time.Time
+	ABTestsLoaded time.Time
 }
 
 func NewInMemory() *InMemory {
@@ -68,4 +70,21 @@ func (c *InMemory) SetTiers(tiers []domain.Tier) {
 	}
 	c.Tiers = m
 	c.TiersLoaded = time.Now()
+}
+
+func (c *InMemory) GetABTests() map[string]*domain.ABTestConfig {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.ABTests
+}
+
+func (c *InMemory) SetABTests(tests []domain.ABTestConfig) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	m := make(map[string]*domain.ABTestConfig)
+	for i := range tests {
+		m[tests[i].SegmentName] = &tests[i]
+	}
+	c.ABTests = m
+	c.ABTestsLoaded = time.Now()
 }

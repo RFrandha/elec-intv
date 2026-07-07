@@ -20,7 +20,7 @@ curl -H "X-API-Key: <READONLY_KEY>" \
 
 ### Prerequisites
 - Docker & Docker Compose
-- Go 1.21+ (for local development)
+- Go 1.25+ (for local development)
 
 ### Run Locally
 
@@ -40,18 +40,26 @@ go test -v ./src/tests/
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  HTTP API Layer (Go net/http)                           │
+│  HTTP API Layer (Go + Gin)                              │
 │  ├─ GET /api/v1/pricing (public)                        │
 │  ├─ GET /api/v1/pricing/{quote_id}/breakdown           │
-│  └─ Admin endpoints (config, events, fleet, analytics) │
+│  ├─ Admin endpoints (config, events, fleet, analytics) │
+│  └─ Middleware: API key auth, rate limiting             │
 └────────────────┬────────────────────────────────────────┘
                  │
 ┌────────────────▼────────────────────────────────────────┐
-│  Pricing Engine (internal/pricing)                       │
+│  Application Service (internal/application)               │
 │  ├─ Factor chain (demand, zone, battery, event, loyalty)│
-│  ├─ Config hot-reload (30s polling)                     │
+│  ├─ Config hot-reload (on-demand refresh)               │
 │  ├─ HMAC audit trail (tamper-evident)                   │
-│  └─ A/B testing (config routing)                        │
+│  └─ A/B testing (config routing per segment)            │
+└────────────────┬────────────────────────────────────────┘
+                 │
+┌────────────────▼────────────────────────────────────────┐
+│  Infrastructure (internal/infrastructure)                 │
+│  ├─ database/ (PostgreSQL repos)                        │
+│  ├─ cache/ (in-memory with RWMutex)                     │
+│  └─ fleet/ (simulator, manual refresh)                  │
 └────────────────┬────────────────────────────────────────┘
                  │
 ┌────────────────▼────────────────────────────────────────┐
@@ -61,7 +69,8 @@ go test -v ./src/tests/
 │  ├─ pricing.pricing_audit (append-only, HMAC-signed)    │
 │  ├─ pricing.events (promotions)                         │
 │  ├─ pricing.tiers (loyalty tiers)                       │
-│  └─ pricing.users (subscribers)                         │
+│  ├─ pricing.users (subscribers)                         │
+│  └─ pricing.ab_test_configs (segment→config mapping)    │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -71,7 +80,7 @@ go test -v ./src/tests/
 
 **Request:**
 ```bash
-curl -H "X-API-Key: demo-read-only-1234" \
+curl -H "X-API-Key: <readonly-key>" \
   "http://localhost:8080/api/v1/pricing?vehicle_id=V001&zone=jakarta_pusat&duration_hours=0.9"
 ```
 
@@ -98,7 +107,7 @@ curl -H "X-API-Key: demo-read-only-1234" \
 ### Pricing Breakdown Endpoint
 
 ```bash
-curl -H "X-API-Key: demo-read-only-1234" \
+curl -H "X-API-Key: <readonly-key>" \
   "http://localhost:8080/api/v1/pricing/Q-a1b2c3d4/breakdown"
 ```
 
@@ -108,13 +117,13 @@ Shows each factor's contribution to final price.
 
 **Get Current Config:**
 ```bash
-curl -H "X-API-Key: admin-secure-key-5678" \
+curl -H "X-API-Key: <admin-key>" \
   "http://localhost:8080/api/v1/admin/config"
 ```
 
 **Update Config:**
 ```bash
-curl -X PUT -H "X-API-Key: admin-secure-key-5678" \
+curl -X PUT -H "X-API-Key: <admin-key>" \
   -H "Content-Type: application/json" \
   -d '{
     "base_price": 4500,
@@ -125,7 +134,11 @@ curl -X PUT -H "X-API-Key: admin-secure-key-5678" \
   "http://localhost:8080/api/v1/admin/config"
 ```
 
-**Config takes effect within 30 seconds via hot-reload.**
+**Refresh Config (after update):**
+```bash
+curl -X POST -H "X-API-Key: <admin-key>" \
+  "http://localhost:8080/api/v1/admin/config/refresh"
+```
 
 ### Available Zones
 
@@ -213,11 +226,17 @@ curl -X POST -H "X-API-Key: <admin-key>" \
 
 **Decision:** A/B segment determines which full pricing config version is loaded.
 
-**Reasoning:**
-- Matches real A/B testing: compare two strategies holistically
-- Not just testing one multiplier factor
-- Allows testing different demand curves, base prices simultaneously
-- Hash-based deterministic assignment (same user always sees same variant)
+**How it works:**
+- `SHA256(user_id) % 100` → segment (0-49=control, 50-99=variant)
+- `ab_test_configs` table maps each segment to a config version
+- Service loads the specific config version for that segment
+- Example: control gets config_v1 (base=4000), variant gets config_v2 (base=4500)
+- Segment logged in audit trail for post-hoc analysis
+
+**Why this matters:**
+- Compare two pricing *strategies* holistically (not just one multiplier)
+- Different base prices, demand rules, and battery discounts per segment
+- Deterministic: same user always sees same variant
 
 **Implementation:** `SHA256(user_id) % 100` → segment (0-49=control, 50-99=variant)
 

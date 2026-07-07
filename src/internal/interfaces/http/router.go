@@ -39,6 +39,8 @@ func SetupRouter(h *Handler) *gin.Engine {
 		admin.DELETE("/events/:id", h.DeleteEvent)
 		admin.GET("/stats/ab-tests", h.GetABStats)
 		admin.GET("/stats/pricing", h.GetPricingStats)
+		admin.GET("/ab-tests", h.ListABTests)
+		admin.DELETE("/ab-tests/:id", h.DeleteABTest)
 	}
 
 	return r

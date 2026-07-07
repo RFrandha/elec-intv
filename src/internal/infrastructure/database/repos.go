@@ -76,6 +76,26 @@ func (r *ConfigRepo) Create(input domain.ConfigInput) error {
 	return err
 }
 
+func (r *ConfigRepo) FindConfigByID(configID int) (*domain.PricingConfig, error) {
+	var configJSON string
+	err := r.db.QueryRow(
+		`SELECT config_jsonb::text FROM pricing.pricing_configs WHERE config_id = $1`, configID,
+	).Scan(&configJSON)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("config not found: %d", configID)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var config domain.PricingConfig
+	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
 type EventRepo struct {
 	db *DB
 }
@@ -246,4 +266,94 @@ func (r *TierRepo) FindAll() ([]domain.Tier, error) {
 		tiers = append(tiers, t)
 	}
 	return tiers, nil
+}
+
+type ABTestRepo struct {
+	db *DB
+}
+
+func NewABTestRepo(db *DB) *ABTestRepo {
+	return &ABTestRepo{db: db}
+}
+
+func (r *ABTestRepo) FindActive() ([]domain.ABTestConfig, error) {
+	rows, err := r.db.Query(
+		`SELECT test_id, test_name, segment_name, config_id, is_active
+		 FROM pricing.ab_test_configs WHERE is_active = true`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tests []domain.ABTestConfig
+	for rows.Next() {
+		var ab domain.ABTestConfig
+		if err := rows.Scan(&ab.TestID, &ab.TestName, &ab.SegmentName, &ab.ConfigID, &ab.IsActive); err != nil {
+			continue
+		}
+		tests = append(tests, ab)
+	}
+	return tests, nil
+}
+
+func (r *ABTestRepo) FindAll() ([]domain.ABTestConfig, error) {
+	rows, err := r.db.Query(
+		`SELECT test_id, test_name, segment_name, config_id, is_active
+		 FROM pricing.ab_test_configs ORDER BY test_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tests []domain.ABTestConfig
+	for rows.Next() {
+		var ab domain.ABTestConfig
+		if err := rows.Scan(&ab.TestID, &ab.TestName, &ab.SegmentName, &ab.ConfigID, &ab.IsActive); err != nil {
+			continue
+		}
+		tests = append(tests, ab)
+	}
+	return tests, nil
+}
+
+func (r *ABTestRepo) Create(testName, segmentName string, configID int) (int, error) {
+	var testID int
+	err := r.db.QueryRow(
+		`INSERT INTO pricing.ab_test_configs (test_name, segment_name, config_id)
+		 VALUES ($1, $2, $3) RETURNING test_id`,
+		testName, segmentName, configID,
+	).Scan(&testID)
+	return testID, err
+}
+
+func (r *ABTestRepo) Delete(testID int) error {
+	result, err := r.db.Exec(`DELETE FROM pricing.ab_test_configs WHERE test_id = $1`, testID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("ab test not found")
+	}
+	return nil
+}
+
+func (r *ABTestRepo) FindBySegment(segmentName string) (*domain.ABTestConfig, error) {
+	var ab domain.ABTestConfig
+	err := r.db.QueryRow(
+		`SELECT at.test_id, at.test_name, at.segment_name, at.config_id, at.is_active,
+		        pc.config_jsonb::text
+		 FROM pricing.ab_test_configs at
+		 JOIN pricing.pricing_configs pc ON pc.config_id = at.config_id
+		 WHERE at.is_active = true AND at.segment_name = $1
+		 LIMIT 1`, segmentName,
+	).Scan(&ab.TestID, &ab.TestName, &ab.SegmentName, &ab.ConfigID, &ab.IsActive)
+
+	if err == sql.ErrNoRows {
+		return &domain.ABTestConfig{SegmentName: segmentName, ConfigID: 1}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &ab, nil
 }

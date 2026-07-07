@@ -6,36 +6,38 @@ This pricing engine calculates battery swap energy pricing for Electrum's EV fle
 
 ## Components
 
-### HTTP API Layer (`internal/api/`)
-- Request validation and error handling
+### HTTP API Layer (`internal/interfaces/http/`)
+- Gin HTTP framework with route groups
 - API key authentication (read-only + admin tiers)
-- Rate limiting middleware (per IP)
-- Routes to pricing engine for calculations
-- Writes audit entries after each pricing calculation
+- Rate limiting middleware (per IP, 100/min public, 10/min admin)
+- Routes to pricing service for calculations
+- Request validation (zone whitelist, kWh bounds)
 
-### Pricing Engine (`internal/pricing/`)
-- Stateless calculation (no side effects)
-- Reads from in-memory cache (config, tiers, events)
-- Applies factor chain sequentially
+### Application Service (`internal/application/`)
+- Orchestrates pricing calculation flow
+- Reads from in-memory cache (config, tiers, events, AB test configs)
+- Applies factor chain sequentially (demand → zone surge → battery → event → loyalty)
 - Signs audit entries with HMAC-SHA256
-- Returns pricing response + breakdown
+- A/B config routing: loads different config per segment
+- Stores breakdowns for quote retrieval
 
-### Database Layer (`internal/db/`)
+### Database Layer (`internal/infrastructure/database/`)
 - PostgreSQL connection pooling (lib/pq)
 - Auto-runs migrations on startup
-- Seeds default data (tiers, config, vehicles)
-- Schema: `pricing.*` (9 tables)
+- Seeds default data (tiers, config, vehicles, AB test configs)
+- Schema: `pricing.*` (10 tables)
 
-### Fleet Simulator (`internal/fleet/`)
-- Background goroutine updates `fleet_state` table every 30s
+### Fleet Simulator (`internal/infrastructure/fleet/`)
+- Manual refresh via `POST /admin/fleet/refresh`
 - Simulates realistic utilization patterns (peak/off-peak, weekdays/weekends)
 - Provides zone utilization for pricing calculations
 - Deterministic variation (sinusoidal) ensures predictable demos
 
-### Configuration Manager (`internal/api/`)
-- Polls `active_config` table every 30 seconds
-- Atomically swaps in-memory config via `sync.RWMutex`
-- Also polls events (30s) and tiers (5min)
+### Configuration Manager (`internal/application/`)
+- Manual refresh via `POST /admin/config/refresh`
+- Reads config, events, tiers, and AB test configs from DB
+- Stores in in-memory cache with `sync.RWMutex`
+- Auto-refresh code exists (30s polling) but disabled for cold-start optimization
 
 ## Data Flow
 
@@ -62,19 +64,19 @@ This pricing engine calculates battery swap energy pricing for Electrum's EV fle
 7. Next request uses new config
 ```
 
-### A/B Test Assignment
+### A/B Test Assignment (Config Routing)
 ```
 1. user_id extracted from vehicle lookup
-2. SHA256(user_id) % 100 → segment number
-3. If < 50 → control config
-4. If >= 50 → variant config
-5. Engine uses selected config for all factors
-6. Segment logged in audit trail
+2. SHA256(user_id) % 100 → segment number (control or variant)
+3. Look up ab_test_configs table for this segment's config_id
+4. Load that config version from pricing_configs table
+5. Use that config for ALL factor calculations (demand, zone, battery, event, loyalty)
+6. Segment + config version logged in audit trail
 ```
 
 ## Database Schema
 
-### Core Tables (9 total)
+### Core Tables (10 total)
 
 **`pricing.tiers`** — Subscription tiers with discount rates
 ```sql

@@ -25,6 +25,7 @@ type PricingService struct {
 	auditRepo   *database.AuditRepo
 	configRepo  *database.ConfigRepo
 	tierRepo    *database.TierRepo
+	abTestRepo  *database.ABTestRepo
 	hmacSecret  string
 	cacheMu     sync.Mutex
 	quotes      map[string]*domain.PricingResult
@@ -39,6 +40,7 @@ func NewPricingService(
 	auditRepo *database.AuditRepo,
 	configRepo *database.ConfigRepo,
 	tierRepo *database.TierRepo,
+	abTestRepo *database.ABTestRepo,
 	hmacSecret string,
 ) *PricingService {
 	return &PricingService{
@@ -50,6 +52,7 @@ func NewPricingService(
 		auditRepo:   auditRepo,
 		configRepo:  configRepo,
 		tierRepo:    tierRepo,
+		abTestRepo:  abTestRepo,
 		hmacSecret:  hmacSecret,
 		quotes:      make(map[string]*domain.PricingResult),
 	}
@@ -78,6 +81,7 @@ func (s *PricingService) RefreshNow() {
 	s.refreshConfig()
 	s.refreshEvents()
 	s.refreshTiers()
+	s.refreshABTests()
 	log.Println("Cache refreshed manually")
 }
 
@@ -109,6 +113,15 @@ func (s *PricingService) refreshTiers() {
 	s.cache.SetTiers(tiers)
 }
 
+func (s *PricingService) refreshABTests() {
+	tests, err := s.abTestRepo.FindActive()
+	if err != nil {
+		log.Printf("Failed to load AB tests: %v", err)
+		return
+	}
+	s.cache.SetABTests(tests)
+}
+
 func (s *PricingService) Calculate(req domain.PricingRequest) (*domain.PricingResult, error) {
 	// 1. Get vehicle
 	vehicle, err := s.vehicleRepo.FindByID(req.VehicleID)
@@ -129,9 +142,21 @@ func (s *PricingService) Calculate(req domain.PricingRequest) (*domain.PricingRe
 	}
 
 	// 4. Calculate factors
-	config := s.cache.GetConfig()
 	tiers := s.cache.GetTiers()
 	events := s.cache.GetEvents()
+
+	// A/B segment → config routing
+	abSegment := assignABSegment(user.ID)
+	abTests := s.cache.GetABTests()
+	config := s.cache.GetConfig() // fallback to default config
+
+	if abConfig, ok := abTests[abSegment]; ok && abConfig.ConfigID > 0 {
+		// Load config version from AB test mapping
+		abConfigJSON, err := s.configRepo.FindConfigByID(abConfig.ConfigID)
+		if err == nil {
+			config = abConfigJSON
+		}
+	}
 
 	factors := []domain.FactorApplied{}
 	multiplier := 1.0
@@ -161,14 +186,7 @@ func (s *PricingService) Calculate(req domain.PricingRequest) (*domain.PricingRe
 	factors = append(factors, domain.FactorApplied{Name: "loyalty_discount", Inputs: map[string]any{"tier": user.SubscriptionTier}, Multiplier: loyaltyMult})
 	multiplier *= loyaltyMult
 
-	// A/B segment
-	abSegment := assignABSegment(user.ID)
-	abModifier := 1.0
-	if abSegment == "variant" {
-		abModifier = 1.05 // 5% higher price in variant
-	}
-
-	finalPrice := config.BasePrice * multiplier * req.DurationHours * abModifier
+	finalPrice := config.BasePrice * multiplier * req.DurationHours
 
 	quoteID := fmt.Sprintf("Q-%s", uuid.New().String()[:8])
 

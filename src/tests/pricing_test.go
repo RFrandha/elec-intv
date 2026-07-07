@@ -127,7 +127,7 @@ func TestABSegmentAssignment(t *testing.T) {
 
 func TestPricingService_Calculate(t *testing.T) {
 	svc := service.NewPricingService(
-		cache.NewInMemory(), nil, nil, nil, nil, nil, nil, nil, "test-secret",
+		cache.NewInMemory(), nil, nil, nil, nil, nil, nil, nil, nil, "test-secret",
 	)
 
 	_ = svc

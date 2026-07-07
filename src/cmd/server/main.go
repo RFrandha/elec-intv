@@ -33,16 +33,17 @@ func main() {
 	auditRepo := database.NewAuditRepo(db)
 	configRepo := database.NewConfigRepo(db)
 	tierRepo := database.NewTierRepo(db)
+	abTestRepo := database.NewABTestRepo(db)
 
 	pricingService := service.NewPricingService(
 		cacheStore, vehicleRepo, userRepo, fleetRepo,
-		eventRepo, auditRepo, configRepo, tierRepo, hmacSecret,
+		eventRepo, auditRepo, configRepo, tierRepo, abTestRepo, hmacSecret,
 	)
 
 	simulator := fleet.NewSimulator(fleetRepo)
 
 	handler := httpHandler.NewHandler(
-		pricingService, configRepo, eventRepo, fleetRepo, auditRepo, simulator,
+		pricingService, configRepo, eventRepo, fleetRepo, auditRepo, simulator, abTestRepo,
 	)
 
 	router := httpHandler.SetupRouter(handler)

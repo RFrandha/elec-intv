@@ -118,3 +118,26 @@ ON CONFLICT (version) DO NOTHING;
 -- Set active config
 INSERT INTO pricing.active_config (id, config_id) VALUES (1, 1)
 ON CONFLICT (id) DO UPDATE SET config_id = 1;
+
+-- A/B Test Configs
+CREATE TABLE IF NOT EXISTS pricing.ab_test_configs (
+    test_id SERIAL PRIMARY KEY,
+    test_name TEXT NOT NULL DEFAULT 'default',
+    segment_name TEXT NOT NULL,
+    config_id INT NOT NULL REFERENCES pricing.pricing_configs(config_id),
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ab_test_active
+ON pricing.ab_test_configs(is_active);
+
+-- Insert variant config (version 2)
+INSERT INTO pricing.pricing_configs (version, config_jsonb, created_by) VALUES
+  (2, '{"base_price": 4500, "demand_rules": [{"day_of_week": "weekday", "hour_start": 5, "hour_end": 7, "multiplier": 1.3}, {"day_of_week": "weekday", "hour_start": 0, "hour_end": 5, "multiplier": 0.9}], "zone_surge_thresholds": [{"min_utilization": 0.8, "multiplier": 1.5}, {"min_utilization": 0.5, "multiplier": 1.2}, {"min_utilization": 0.0, "multiplier": 1.0}], "battery_discount_tiers": [{"max_soc": 40.0, "multiplier": 0.85}, {"max_soc": 60.0, "multiplier": 0.95}, {"max_soc": 100.0, "multiplier": 1.0}]}'::jsonb, 'system')
+ON CONFLICT (version) DO NOTHING;
+
+-- Seed A/B test mapping: control=config1, variant=config2
+INSERT INTO pricing.ab_test_configs (test_name, segment_name, config_id, is_active) VALUES
+  ('default', 'control', 1, true),
+  ('default', 'variant', 2, true);

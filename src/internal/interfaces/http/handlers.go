@@ -23,6 +23,7 @@ type Handler struct {
 	fleetRepo      *database.FleetStateRepo
 	auditRepo      *database.AuditRepo
 	fleetSimulator *fleet.Simulator
+	abTestRepo     *database.ABTestRepo
 }
 
 func NewHandler(
@@ -32,6 +33,7 @@ func NewHandler(
 	fleetRepo *database.FleetStateRepo,
 	auditRepo *database.AuditRepo,
 	fleetSimulator *fleet.Simulator,
+	abTestRepo *database.ABTestRepo,
 ) *Handler {
 	return &Handler{
 		pricingService: pricingService,
@@ -40,6 +42,7 @@ func NewHandler(
 		fleetRepo:      fleetRepo,
 		auditRepo:      auditRepo,
 		fleetSimulator: fleetSimulator,
+		abTestRepo:     abTestRepo,
 	}
 }
 
@@ -368,6 +371,35 @@ func (h *Handler) RefreshConfig(c *gin.Context) {
 func (h *Handler) RefreshFleet(c *gin.Context) {
 	h.fleetSimulator.RefreshOnce()
 	c.JSON(http.StatusOK, gin.H{"message": "fleet state refreshed"})
+}
+
+func (h *Handler) ListABTests(c *gin.Context) {
+	tests, err := h.abTestRepo.FindAll()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "failed to list AB tests"})
+		return
+	}
+	c.JSON(http.StatusOK, tests)
+}
+
+func (h *Handler) DeleteABTest(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid test_id"})
+		return
+	}
+
+	if err := h.abTestRepo.Delete(id); err != nil {
+		if err.Error() == "ab test not found" {
+			c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "AB test not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "failed to delete"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "AB test deleted"})
 }
 
 var rateLimiters = struct {
