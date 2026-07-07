@@ -39,13 +39,10 @@ func main() {
 		eventRepo, auditRepo, configRepo, tierRepo, hmacSecret,
 	)
 
-	pricingService.StartCacheUpdater()
-
 	simulator := fleet.NewSimulator(fleetRepo)
-	simulator.Start()
 
 	handler := httpHandler.NewHandler(
-		pricingService, configRepo, eventRepo, fleetRepo, auditRepo,
+		pricingService, configRepo, eventRepo, fleetRepo, auditRepo, simulator,
 	)
 
 	router := httpHandler.SetupRouter(handler)

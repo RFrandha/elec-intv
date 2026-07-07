@@ -72,6 +72,13 @@ func (s *PricingService) StartCacheUpdater() {
 	log.Println("Cache updater started (config/events: 30s, tiers: 5m)")
 }
 
+func (s *PricingService) RefreshNow() {
+	s.refreshConfig()
+	s.refreshEvents()
+	s.refreshTiers()
+	log.Println("Cache refreshed manually")
+}
+
 func (s *PricingService) refreshConfig() {
 	config, err := s.configRepo.FindActive()
 	if err != nil {

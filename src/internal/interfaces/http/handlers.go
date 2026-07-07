@@ -11,6 +11,7 @@ import (
 	"github.com/RFrandha/elec-intv/src/internal/application"
 	"github.com/RFrandha/elec-intv/src/internal/domain"
 	"github.com/RFrandha/elec-intv/src/internal/infrastructure/database"
+	fleet "github.com/RFrandha/elec-intv/src/internal/infrastructure/fleet"
 	"github.com/RFrandha/elec-intv/src/internal/interfaces/dto"
 )
 
@@ -20,6 +21,7 @@ type Handler struct {
 	eventRepo      *database.EventRepo
 	fleetRepo      *database.FleetStateRepo
 	auditRepo      *database.AuditRepo
+	fleetSimulator *fleet.Simulator
 }
 
 func NewHandler(
@@ -28,6 +30,7 @@ func NewHandler(
 	eventRepo *database.EventRepo,
 	fleetRepo *database.FleetStateRepo,
 	auditRepo *database.AuditRepo,
+	fleetSimulator *fleet.Simulator,
 ) *Handler {
 	return &Handler{
 		pricingService: pricingService,
@@ -35,6 +38,7 @@ func NewHandler(
 		eventRepo:      eventRepo,
 		fleetRepo:      fleetRepo,
 		auditRepo:      auditRepo,
+		fleetSimulator: fleetSimulator,
 	}
 }
 
@@ -307,4 +311,14 @@ func AdminAuthMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func (h *Handler) RefreshConfig(c *gin.Context) {
+	h.pricingService.RefreshNow()
+	c.JSON(http.StatusOK, gin.H{"message": "config/events/tiers refreshed"})
+}
+
+func (h *Handler) RefreshFleet(c *gin.Context) {
+	h.fleetSimulator.RefreshOnce()
+	c.JSON(http.StatusOK, gin.H{"message": "fleet state refreshed"})
 }

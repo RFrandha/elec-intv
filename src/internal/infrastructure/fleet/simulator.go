@@ -40,6 +40,11 @@ func (s *Simulator) Stop() {
 	close(s.stopCh)
 }
 
+func (s *Simulator) RefreshOnce() {
+	s.updateFleetState()
+	log.Println("Fleet state refreshed manually")
+}
+
 func (s *Simulator) updateFleetState() {
 	hour := time.Now().Hour()
 	weekday := time.Now().Weekday() != time.Saturday && time.Now().Weekday() != time.Sunday

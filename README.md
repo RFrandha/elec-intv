@@ -136,6 +136,35 @@ curl -X PUT -H "X-API-Key: admin-secure-key-5678" \
 - `jakarta_utara` (North Jakarta)
 - `bogor`, `depok`, `tangerang`, `bekasi` (satellite cities)
 
+## Configuration Management
+
+### Update Config
+```bash
+curl -X PUT -H "X-API-Key: <admin-key>" \
+  -H "Content-Type: application/json" \
+  -d '{"base_price": 4500, "demand_rules": [...]}' \
+  "https://<url>/api/v1/admin/config"
+```
+
+### Manual Refresh (Post-Update)
+After updating config, refresh the in-memory cache manually:
+
+```bash
+# Refresh config, events, and tiers:
+curl -X POST -H "X-API-Key: <admin-key>" \
+  "https://<url>/api/v1/admin/config/refresh"
+
+# Refresh fleet state utilization:
+curl -X POST -H "X-API-Key: <admin-key>" \
+  "https://<url>/api/v1/admin/fleet/refresh"
+```
+
+### Config Hot-Reload Strategy
+- **Scheduled auto-refresh code exists** (30s polling for config/events, 5min for tiers, 30s fleet simulation)
+- **Currently disabled** on startup to avoid keeping Cloud Run alive (cold-start optimization)
+- **Manual refresh via `POST /admin/config/refresh` and `POST /admin/fleet/refresh`** when needed
+- To enable auto-refresh: uncomment `StartCacheUpdater()` and `simulator.Start()` in `src/cmd/server/main.go`
+
 ## Key Decisions
 
 ### 1. Duration_hours as kWh (Not Time)
@@ -202,6 +231,23 @@ curl -X PUT -H "X-API-Key: admin-secure-key-5678" \
 - Lightweight: <1ms overhead per calculation
 
 **Trade-off:** Not cryptographically bulletproof (key could be compromised), but sufficient for 72h test + audit trail integrity.
+
+### 6. Config Hot-Reload Strategy
+
+**Decision:** Manual refresh via admin API (scheduled auto-refresh code exists but disabled).
+
+**Reasoning:**
+- Cloud Run cold-start: background goroutines keep the instance alive, defeating auto-scaling-to-zero
+- Code for 30s polling (config/events/tiers) and 30s fleet simulation already exists in the codebase
+- Manually triggered via `POST /admin/config/refresh` and `POST /admin/fleet/refresh`
+
+**To enable auto-refresh:** Uncomment these two lines in `src/cmd/server/main.go`:
+```go
+pricingService.StartCacheUpdater()  // line 42
+simulator.Start()                    // line 45
+```
+
+**Trade-off:** Manual refresh adds one extra step after config updates. Acceptable for 72h test. In production, auto-refresh is standard.
 
 ## Pricing Formula
 
