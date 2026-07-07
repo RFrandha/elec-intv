@@ -4,7 +4,7 @@ Electrum Take Home Test — Case 2: Dynamic Pricing Engine for EV Rentals
 
 ## Deployed Instance
 
-Base URL: `https://pricing-engine-jtvk2a2vzq-as.a.run.app`
+Base URL: `https://pricing-engine-599858649457.asia-southeast1.run.app`
 
 API keys are provided separately in the onboarding PDF (not in this repository).
 
@@ -13,7 +13,7 @@ API keys are provided separately in the onboarding PDF (not in this repository).
 ```bash
 # Replace <READONLY_KEY> with key from the onboarding PDF
 curl -H "X-API-Key: <READONLY_KEY>" \
-  "https://pricing-engine-jtvk2a2vzq-as.a.run.app/api/v1/pricing?vehicle_id=V001&zone=jakarta_pusat&duration_hours=0.9"
+  "https://pricing-engine-599858649457.asia-southeast1.run.app/api/v1/pricing?vehicle_id=V001&zone=jakarta_pusat&duration_hours=0.9"
 ```
 
 ## Quick Start
