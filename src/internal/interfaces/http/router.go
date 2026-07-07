@@ -1,6 +1,8 @@
 package http
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,6 +17,7 @@ func SetupRouter(h *Handler) *gin.Engine {
 	// Public endpoints (require read-only or admin key)
 	pricing := api.Group("/pricing")
 	pricing.Use(AuthMiddleware())
+	pricing.Use(RateLimitMiddleware(100, time.Minute))
 	{
 		pricing.GET("", h.GetPricing)
 		pricing.GET("/:quote_id/breakdown", h.GetPricingBreakdown)
@@ -23,6 +26,7 @@ func SetupRouter(h *Handler) *gin.Engine {
 	// Admin endpoints (require admin key)
 	admin := api.Group("/admin")
 	admin.Use(AdminAuthMiddleware())
+	admin.Use(RateLimitMiddleware(10, time.Minute))
 	{
 		admin.GET("/config", h.GetAdminConfig)
 		admin.PUT("/config", h.UpdateAdminConfig)
@@ -34,6 +38,7 @@ func SetupRouter(h *Handler) *gin.Engine {
 		admin.POST("/events", h.CreateEvent)
 		admin.DELETE("/events/:id", h.DeleteEvent)
 		admin.GET("/stats/ab-tests", h.GetABStats)
+		admin.GET("/stats/pricing", h.GetPricingStats)
 	}
 
 	return r

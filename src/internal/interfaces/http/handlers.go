@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -95,7 +96,28 @@ func (h *Handler) GetPricingBreakdown(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "breakdown endpoint pending implementation"})
+	result, err := h.pricingService.GetBreakdown(quoteID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	factors := make([]dto.FactorDTO, len(result.Factors))
+	for i, f := range result.Factors {
+		factors[i] = dto.FactorDTO{
+			Name:       f.Name,
+			Inputs:     f.Inputs,
+			Multiplier: f.Multiplier,
+		}
+	}
+
+	c.JSON(http.StatusOK, dto.BreakdownResponse{
+		QuoteID:        result.QuoteID,
+		BaseRatePerKWh: result.BaseRate,
+		KWhConsumed:    result.KWhConsumed,
+		Factors:        factors,
+		FinalPrice:     result.FinalPrice,
+	})
 }
 
 func (h *Handler) GetAdminConfig(c *gin.Context) {
@@ -267,6 +289,31 @@ func (h *Handler) GetABStats(c *gin.Context) {
 	})
 }
 
+func (h *Handler) GetPricingStats(c *gin.Context) {
+	startStr := c.DefaultQuery("start_time", time.Now().Add(-24*time.Hour).Format(time.RFC3339))
+	endStr := c.DefaultQuery("end_time", time.Now().Format(time.RFC3339))
+
+	start, err := time.Parse(time.RFC3339, startStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid start_time"})
+		return
+	}
+
+	end, err := time.Parse(time.RFC3339, endStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid end_time"})
+		return
+	}
+
+	stats, err := h.auditRepo.FindZoneStats(start, end)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "failed to load stats"})
+		return
+	}
+
+	c.JSON(http.StatusOK, stats)
+}
+
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := c.GetHeader("X-API-Key")
@@ -321,4 +368,44 @@ func (h *Handler) RefreshConfig(c *gin.Context) {
 func (h *Handler) RefreshFleet(c *gin.Context) {
 	h.fleetSimulator.RefreshOnce()
 	c.JSON(http.StatusOK, gin.H{"message": "fleet state refreshed"})
+}
+
+var rateLimiters = struct {
+	sync.Mutex
+	ips map[string]*rateBucket
+}{ips: make(map[string]*rateBucket)}
+
+type rateBucket struct {
+	count   int
+	resetAt time.Time
+}
+
+func RateLimitMiddleware(limit int, window time.Duration) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		if ip == "" {
+			ip = c.Request.RemoteAddr
+		}
+
+		rateLimiters.Lock()
+		bucket, exists := rateLimiters.ips[ip]
+		now := time.Now()
+
+		if !exists || now.After(bucket.resetAt) {
+			rateLimiters.ips[ip] = &rateBucket{count: 1, resetAt: now.Add(window)}
+			rateLimiters.Unlock()
+			c.Next()
+			return
+		}
+
+		bucket.count++
+		if bucket.count > limit {
+			rateLimiters.Unlock()
+			c.JSON(http.StatusTooManyRequests, dto.ErrorResponse{Error: "rate limit exceeded"})
+			c.Abort()
+			return
+		}
+		rateLimiters.Unlock()
+		c.Next()
+	}
 }

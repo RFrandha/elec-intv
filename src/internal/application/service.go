@@ -17,7 +17,7 @@ import (
 )
 
 type PricingService struct {
-	cache      *cache.InMemory
+	cache       *cache.InMemory
 	vehicleRepo *database.VehicleRepo
 	userRepo    *database.UserRepo
 	fleetRepo   *database.FleetStateRepo
@@ -27,6 +27,7 @@ type PricingService struct {
 	tierRepo    *database.TierRepo
 	hmacSecret  string
 	cacheMu     sync.Mutex
+	quotes      map[string]*domain.PricingResult
 }
 
 func NewPricingService(
@@ -50,6 +51,7 @@ func NewPricingService(
 		configRepo:  configRepo,
 		tierRepo:    tierRepo,
 		hmacSecret:  hmacSecret,
+		quotes:      make(map[string]*domain.PricingResult),
 	}
 }
 
@@ -161,9 +163,12 @@ func (s *PricingService) Calculate(req domain.PricingRequest) (*domain.PricingRe
 
 	// A/B segment
 	abSegment := assignABSegment(user.ID)
-	_ = abSegment // config routing not yet implemented in v1
+	abModifier := 1.0
+	if abSegment == "variant" {
+		abModifier = 1.05 // 5% higher price in variant
+	}
 
-	finalPrice := config.BasePrice * multiplier * req.DurationHours
+	finalPrice := config.BasePrice * multiplier * req.DurationHours * abModifier
 
 	quoteID := fmt.Sprintf("Q-%s", uuid.New().String()[:8])
 
@@ -189,7 +194,7 @@ func (s *PricingService) Calculate(req domain.PricingRequest) (*domain.PricingRe
 		log.Printf("Failed to write audit entry: %v", err)
 	}
 
-	return &domain.PricingResult{
+	result := &domain.PricingResult{
 		QuoteID:    quoteID,
 		VehicleID:  req.VehicleID,
 		Zone:       req.Zone,
@@ -199,7 +204,25 @@ func (s *PricingService) Calculate(req domain.PricingRequest) (*domain.PricingRe
 		ValidUntil: time.Now().Add(30 * time.Second),
 		ABSegment:  abSegment,
 		Factors:    factors,
-	}, nil
+	}
+
+	s.cacheMu.Lock()
+	s.quotes[quoteID] = result
+	s.cacheMu.Unlock()
+
+	return result, nil
+}
+
+func (s *PricingService) GetBreakdown(quoteID string) (*domain.PricingResult, error) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+
+	result, ok := s.quotes[quoteID]
+	if !ok {
+		return nil, fmt.Errorf("quote not found: %s", quoteID)
+	}
+
+	return result, nil
 }
 
 func (s *PricingService) VerifyAudit(entry domain.AuditEntry) bool {
