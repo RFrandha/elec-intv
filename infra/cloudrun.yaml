@@ -1,0 +1,41 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: pricing-engine
+  labels:
+    cloud.googleapis.com/location: asia-southeast1
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: '100'
+        autoscaling.knative.dev/minScale: '1'
+        run.googleapis.com/cloudsql-instances: PROJECT_ID:asia-southeast1:electrum-pricing
+    spec:
+      containerConcurrency: 80
+      containers:
+      - image: gcr.io/PROJECT_ID/pricing-engine:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DATABASE_URL
+          value: postgres://electrum:PASSWORD@/electrum_pricing?host=/cloudsql/PROJECT_ID:asia-southeast1:electrum-pricing
+        - name: ADMIN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pricing-secrets
+              key: admin-key
+        - name: READ_ONLY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: pricing-secrets
+              key: read-only-key
+        - name: HMAC_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: pricing-secrets
+              key: hmac-secret
+        resources:
+          limits:
+            cpu: '1'
+            memory: 512Mi
