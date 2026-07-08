@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```bash
-go test -v ./src/tests/
+go test -v ./...
 ```
 
 ## Test List
@@ -50,21 +50,21 @@ go test -v ./src/tests/
 ## Running Specific Tests
 
 ```bash
-go test -v ./src/tests/ -run TestBatteryDiscount
-go test -v ./src/tests/ -run TestABSegment_Determinism
-go test -v ./src/tests/ -run TestValidation
+go test -v ./... -run TestBatteryDiscount
+go test -v ./... -run TestABSegment_Determinism
+go test -v ./... -run TestValidation
 ```
 
 ## Running with Coverage
 
 ```bash
-go test -coverprofile=coverage.out ./src/tests/
+go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 ```
 
 ## Test Architecture
 
-- **14 tests total** across 2 test files
+- **14 tests total** across 2 packages: `application` (10 tests), `http` (4 tests)
 - **Independent expected values:** Tests use manual calculation helpers (e.g., `calcBatteryManual`, `calcDemandManual`) instead of calling the actual service functions — avoids tautological tests
 - **Determinism:** A/B segment tests run 10 users twice and verify same segment assignment
 - **Edge cases covered:** 0% battery, 100% utilization, >1.8 kWh, empty fields, boundary values (0.1, 1.8)
@@ -73,14 +73,14 @@ go tool cover -html=coverage.out
 
 ```bash
 # Run all tests
-go test -count=1 ./src/tests/
+go test -count=1 ./...
 
 # Run with verbose output
-go test -v -count=1 ./src/tests/
+go test -v -count=1 ./...
 
 # Run integration test (requires database)
-go test -v -count=1 ./src/tests/ -run TestPricingService_Calculate
+go test -v -count=1 github.com/RFrandha/elec-intv/src/internal/application -run TestPricingService_Calculate
 
 # Check compilation without running
-go build ./src/...
+go build ./...
 ```
