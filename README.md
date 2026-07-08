@@ -311,6 +311,7 @@ Full documentation available in the `docs/` directory:
 | `SCALABILITY.md` | Scaling plan, connection pooling, cost projections |
 | `UBIQUITOUS_LANGUAGE.md` | Domain glossary — terms, definitions, relationships |
 | `TEST_SCENARIO.md` | Complete test suite with curl commands and expected responses |
+| `API_DOCUMENTATION.md` | Full API reference with endpoint docs, examples, and error codes |
 
 ## AI Tool Usage
 
