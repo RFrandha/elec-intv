@@ -34,15 +34,14 @@ func TestValidation_KWhBounds(t *testing.T) {
 		{0.1, true},
 		{0.9, true},
 		{1.8, true},
-		{5.0, true},
 		{0.0, false},
 		{-1.0, false},
-		{5.1, false},
+		{1.9, false},
 		{999, false},
 	}
 
 	for _, tt := range tests {
-		isValid := tt.kwh > 0 && tt.kwh <= 5.0
+		isValid := tt.kwh > 0 && tt.kwh <= 1.8
 		if isValid != tt.isValid {
 			t.Errorf("kWh %.1f: expected valid=%v, got %v", tt.kwh, tt.isValid, isValid)
 		}

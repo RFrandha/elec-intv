@@ -57,8 +57,8 @@ func (h *Handler) GetPricing(c *gin.Context) {
 	}
 
 	duration, err := strconv.ParseFloat(durationStr, 64)
-	if err != nil || duration <= 0 || duration > 5.0 {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid duration_hours: must be 0.1-5.0"})
+	if err != nil || duration <= 0 || duration > 1.8 {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid duration_hours: must be 0.1-1.8"})
 		return
 	}
 

@@ -12,6 +12,10 @@ func SetupRouter(h *Handler) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(corsMiddleware())
 
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+
 	api := r.Group("/api/v1")
 
 	// Public endpoints (require read-only or admin key)
