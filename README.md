@@ -32,6 +32,8 @@ API runs at `http://localhost:8080`
 
 ### Run Tests
 
+See [Test Suite](docs/TEST_SUITE.md) for complete test documentation (14 tests, coverage instructions, test architecture).
+
 ```bash
 go test -v ./src/tests/
 ```
