@@ -20,7 +20,7 @@ jobs:
         go-version: '1.25'
 
     - name: Run tests
-      run: go test -count=1 ./src/tests/
+      run: go test -count=1 ./...
 
     - name: Authenticate to Google Cloud
       uses: google-github-actions/auth@v2
