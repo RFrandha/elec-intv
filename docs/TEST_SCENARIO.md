@@ -396,9 +396,9 @@ curl -s -H "X-API-Key: $ADMIN_API_KEY" \
     {"min_utilization": 0, "multiplier": 1.0}
   ],
   "battery_discount_tiers": [
-    {"max_soc": 40.0, "multiplier": 0.85},
-    {"max_soc": 60.0, "multiplier": 0.95},
-    {"max_soc": 100.0, "multiplier": 1.0}
+    {"min_soc": 60.0, "multiplier": 0.80},
+    {"min_soc": 40.0, "multiplier": 0.90},
+    {"min_soc": 0.0, "multiplier": 1.0}
   ]
 }
 ```

@@ -64,7 +64,7 @@ type ZoneSurgeThreshold struct {
 }
 
 type BatteryDiscountTier struct {
-	MaxSOC     float64 `json:"max_soc"`
+	MinSOC     float64 `json:"min_soc"`
 	Multiplier float64 `json:"multiplier"`
 }
 

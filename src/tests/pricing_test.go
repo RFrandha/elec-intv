@@ -61,27 +61,27 @@ func TestZoneSurge(t *testing.T) {
 func TestBatteryDiscount(t *testing.T) {
 	cfg := &domain.PricingConfig{
 		BatteryDiscountTiers: []domain.BatteryDiscountTier{
-			{MaxSOC: 40.0, Multiplier: 0.85},
-			{MaxSOC: 60.0, Multiplier: 0.95},
-			{MaxSOC: 100.0, Multiplier: 1.0},
+			{MinSOC: 60.0, Multiplier: 0.80},
+			{MinSOC: 40.0, Multiplier: 0.90},
+			{MinSOC: 0.0, Multiplier: 1.0},
 		},
 	}
 
 	tests := []struct {
-		soc      float64
-		expected float64
+		returnSOC float64
+		expected  float64
 	}{
-		{30.0, 0.85},
-		{40.0, 0.85},
-		{50.0, 0.95},
-		{60.0, 0.95},
-		{80.0, 1.0},
+		{70.0, 0.80},
+		{60.0, 0.80},
+		{50.0, 0.90},
+		{40.0, 0.90},
+		{20.0, 1.0},
 	}
 
 	for _, tt := range tests {
-		result := calcBatteryManual(cfg, tt.soc)
+		result := calcBatteryManual(cfg, tt.returnSOC)
 		if result != tt.expected {
-			t.Errorf("SoC %.1f: expected %.2f, got %.2f", tt.soc, tt.expected, result)
+			t.Errorf("Return SoC %.1f: expected %.2f, got %.2f", tt.returnSOC, tt.expected, result)
 		}
 	}
 }
@@ -142,8 +142,9 @@ func TestPricingService_Calculate(t *testing.T) {
 			{MinUtilization: 0.0, Multiplier: 1.0},
 		},
 		BatteryDiscountTiers: []domain.BatteryDiscountTier{
-			{MaxSOC: 40.0, Multiplier: 0.85},
-			{MaxSOC: 100.0, Multiplier: 1.0},
+			{MinSOC: 60.0, Multiplier: 0.80},
+			{MinSOC: 40.0, Multiplier: 0.90},
+			{MinSOC: 0.0, Multiplier: 1.0},
 		},
 	}
 	_ = cfg
@@ -177,7 +178,7 @@ func calcSurgeManual(config *domain.PricingConfig, utilization float64) float64 
 
 func calcBatteryManual(config *domain.PricingConfig, soc float64) float64 {
 	for _, t := range config.BatteryDiscountTiers {
-		if soc <= t.MaxSOC {
+		if soc >= t.MinSOC {
 			return t.Multiplier
 		}
 	}

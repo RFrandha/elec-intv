@@ -12,7 +12,7 @@ Domain terminology for Electrum Dynamic Pricing Engine. Based on real business r
 | **Pricing Breakdown** | Per-factor explanation showing each multiplier and its input values | Price decomposition, itemization |
 | **Quote TTL** | Duration (30 seconds) that a Price Quote remains valid before expiration | Quote expiry, timeout |
 | **Final Price** | Total calculated price after all factors are applied to the Base Price | Total price, total |
-| **Battery Discount Factor** | Multiplier applied when vehicle SoC is below configurable thresholds (0.85 for <40%, 0.95 for <60%) | SoC discount, low-battery discount |
+| **Battery Discount Factor** | Multiplier applied based on estimated return battery SoC at BSS (0.80 for ≥60%, 0.90 for 40-60%, 1.0 for <40%), calculated as `(1.8 - kWh_consumed) / 1.8 × 100` | SoC discount, return-battery discount |
 | **Loyalty Discount** | Multiplier applied based on subscriber tier (0.9 for Gold, 1.0 for Normal) | Tier discount, subscription discount |
 
 ## Factors

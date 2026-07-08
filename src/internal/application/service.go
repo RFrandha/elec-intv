@@ -171,9 +171,13 @@ func (s *PricingService) Calculate(req domain.PricingRequest) (*domain.PricingRe
 	factors = append(factors, domain.FactorApplied{Name: "zone_surge", Inputs: map[string]any{"zone": req.Zone, "utilization": req.ZoneUtilization}, Multiplier: zoneMult})
 	multiplier *= zoneMult
 
-	// Battery discount
-	batteryMult := calcBatteryDiscount(config, vehicle.CurrentSOC)
-	factors = append(factors, domain.FactorApplied{Name: "battery_discount", Inputs: map[string]any{"soc": vehicle.CurrentSOC}, Multiplier: batteryMult})
+	// Battery discount (return SoC: assumes 100% pickup, calculated from kWh consumed)
+	returnSOC := (1.8 - req.DurationHours) / 1.8 * 100
+	if returnSOC < 0 {
+		returnSOC = 0
+	}
+	batteryMult := calcBatteryDiscount(config, returnSOC)
+	factors = append(factors, domain.FactorApplied{Name: "battery_discount", Inputs: map[string]any{"kwh_consumed": req.DurationHours, "return_soc": returnSOC}, Multiplier: batteryMult})
 	multiplier *= batteryMult
 
 	// Event discount
@@ -284,7 +288,7 @@ func calcZoneSurge(config *domain.PricingConfig, utilization float64) float64 {
 
 func calcBatteryDiscount(config *domain.PricingConfig, soc float64) float64 {
 	for _, t := range config.BatteryDiscountTiers {
-		if soc <= t.MaxSOC {
+		if soc >= t.MinSOC {
 			return t.Multiplier
 		}
 	}
