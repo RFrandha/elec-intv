@@ -117,3 +117,128 @@ Domain terminology for Electrum Dynamic Pricing Engine. Based on real business r
 - **"admin"** is ambiguous between **Operations Admin** (domain role managing config) and the technical **Admin API Key** (auth mechanism). These are related but distinct concepts.
 - **"factor" vs "discount" vs "multiplier"**: A **Factor** is the general concept, a **Multiplier** is the numeric value, and a **Discount** is a special case of a Multiplier where the value < 1.0.
 - **"A/B test"** in this system means **config routing** (different config per segment), not a single multiplier. This is intentional and documented.
+
+## Pricing Calculation Walkthrough
+
+### The Formula
+
+```
+final_price = base_rate × demand × zone_surge × battery × event × loyalty × kWh
+```
+
+All factors start at **1.0×** (no effect). Stacking multiplies them together.
+
+### Factor 1: Base Price (4,000 Rp/kWh)
+
+**What it is:** Starting rate before adjustments, covers electricity + battery depreciation + station ops.
+
+**Effect:** `4,000 × kWh = base cost`
+
+---
+
+### Factor 2: Demand Multiplier (Time-of-Day)
+
+**What it is:** Rush hours cost more, quiet hours cost less.
+
+| Time | Multiplier | Rationale |
+|---|---|---|
+| 5-7 AM weekday | 1.3× | Morning rush, everyone going to work |
+| 0-5 AM | 0.9× | Late night, almost no demand |
+| Other | 1.0× | Normal |
+
+**Like** Uber surge pricing — balances load across time.
+
+---
+
+### Factor 3: Zone Surge (Fleet Utilization)
+
+**What it is:** Zones with few available vehicles get premium pricing.
+
+| Utilization | Multiplier | Meaning |
+|---|---|---|
+| >80% | 1.5× | Only 20% of vehicles left |
+| 50-80% | 1.2× | Moderately busy |
+| <50% | 1.0× | Plenty available |
+
+**Why:** Encourages rentals in quieter zones. Revenue optimization at peak demand.
+
+---
+
+### Factor 4: Battery Discount (Return SoC)
+
+**What it is:** Discount based on estimated battery condition returned to BSS.
+
+**Calculation:**
+```
+return_soc = (1.8 - kWh_consumed) / 1.8 × 100
+```
+
+Assumes all rentals start with 100% charged battery (1.8 kWh max).
+
+| Return SoC | Discount | Why |
+|---|---|---|
+| ≥60% | 20% off | Excellent — fast-charge ready in 20 min |
+| 40-60% | 10% off | Good — still fast-chargeable |
+| <40% | None | Depleted — needs 3-6 hour slow charge |
+
+**Incentive:** Return batteries in chargeable state → BSS turns around faster → more bikes available.
+
+---
+
+### Factor 5: Event Discount (Promotions)
+
+**What it is:** Time-limited promos scoped to zone or nationwide.
+
+**Effect:** Admin creates event → applies automatically during its window.
+
+| Example | Multiplier | Trigger |
+|---|---|---|
+| Ramadan Special (Jakarta Pusat) | 0.8× | Swap in jakarta_pusat during event |
+| National Holiday | 0.85× | Any zone during event |
+| No event | 1.0× | No effect |
+
+**Why:** Marketing campaigns. Drive traffic to specific zones or times.
+
+---
+
+### Factor 6: Loyalty Discount (Subscription Tier)
+
+**What it is:** Subscribers get automatic discount on every swap.
+
+| Tier | Multiplier | Benefit |
+|---|---|---|
+| Gold | 0.9× | 10% off every swap |
+| Normal | 1.0× | No discount |
+
+**Why:** Reward subscribers, increase retention. Gold members pay monthly → get perks.
+
+---
+
+### Full Example
+
+**Scenario:** Gold subscriber, 6 AM weekday (rush), Jakarta Pusat (96% utilization), returns battery at 50% SoC (0.9 kWh used), no promotions.
+
+```
+Step 1: Base         4,000
+Step 2: Demand       4,000 × 1.3      = 5,200   (morning rush 1.3×)
+Step 3: Zone surge   5,200 × 1.5      = 7,800   (96% util → 1.5×)
+Step 4: Battery      7,800 × 0.90     = 7,020   (return SoC 50% → 0.90×)
+Step 5: Event        7,020 × 1.0      = 7,020   (no event)
+Step 6: Loyalty      7,020 × 0.9      = 6,318   (gold → 0.9×)
+Step 7: kWh          6,318 × 0.9      = 5,686   (0.9 kWh consumed)
+```
+
+**Final price: Rp 5,686**
+
+---
+
+### Why Multiply (Not Add)?
+
+Adding would give weird results:
+- 1.3 + 1.5 + 0.9 + 1.0 + 0.9 = +5.6 (impossible, prices explode)
+- Negative discounts break arithmetic
+
+Multiplying means factors **stack naturally**:
+- Rush + surge + good battery return = fair combined effect
+- Order doesn't matter (commutative)
+- Any factor can be disabled by setting to 1.0

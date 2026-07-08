@@ -285,16 +285,18 @@ simulator.Start()                    // line 45
 final_price = base_rate_per_kwh 
             × demand_multiplier(hour, day_of_week)
             × zone_surge_factor(zone_utilization)
-            × battery_discount_factor(soc)
+            × battery_discount_factor(return_soc)
             × event_discount(zone, time)
             × loyalty_discount(subscription_tier)
             × duration_hours (kWh)
 ```
 
-**Example:** Peak hour, high-demand zone, gold subscriber, 0.9 kWh swap, low battery
+For a detailed explanation of each multiplier and how they work together, see [Pricing Calculation Walkthrough](docs/UBIQUITOUS_LANGUAGE.md#pricing-calculation-walkthrough).
+
+**Example:** Peak hour, high-demand zone, gold subscriber, 0.9 kWh swap, 50% return SoC
 ```
-4000 × 1.3 (peak) × 1.5 (surge) × 0.85 (battery) × 1.0 (no event) × 0.9 (gold) × 0.9 kWh
-= 5,963 Rp
+4000 × 1.3 (peak) × 1.5 (surge) × 0.90 (return SoC) × 1.0 (no event) × 0.9 (gold) × 0.9 kWh
+= 5,686 Rp
 ```
 
 ## Documentation
