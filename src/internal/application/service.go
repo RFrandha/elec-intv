@@ -132,7 +132,7 @@ func (s *PricingService) Calculate(req domain.PricingRequest) (*domain.PricingRe
 	// 2. Get user for loyalty
 	user, err := s.userRepo.FindByID(vehicle.CurrentUserID)
 	if err != nil {
-		user = &domain.User{SubscriptionTier: "normal"}
+		user = &domain.User{ID: vehicle.CurrentUserID, SubscriptionTier: "normal"}
 	}
 
 	// 3. Get fleet state for zone utilization
@@ -188,7 +188,7 @@ func (s *PricingService) Calculate(req domain.PricingRequest) (*domain.PricingRe
 
 	finalPrice := config.BasePrice * multiplier * req.DurationHours
 
-	quoteID := fmt.Sprintf("Q-%s", uuid.New().String()[:8])
+	quoteID := uuid.New().String()
 
 	inputsJSON, _ := json.Marshal(req)
 	factorsJSON, _ := json.Marshal(factors)
