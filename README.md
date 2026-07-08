@@ -324,16 +324,20 @@ Full documentation available in the `docs/` directory:
 - `to-prd` — Synthesize conversation into PRD
 - `ubiquitous-language` — Extract domain terminology, build UBIQUITOUS_LANGUAGE.md
 - `tdd` — Drive 10 TDD cycles in vertical slices
-- `design-an-interface` — Explore API shape alternatives
-- `domain-modeling` — Sharpen terminology and relationships
+- `diagnosing-bugs` — Debug migration, audit, and rate limiting issues
+- `handoff` — Compact conversation state across sessions
+- `decision-mapping` — Structure investigation tickets from loose ideas
 
 **What Worked Well:**
-- Scaffolding entire DDD project structure (Layered: interfaces → application → infrastructure → domain)
-- Generating Gin HTTP handlers with middleware and validation
+- Scaffolding full DDD project structure (domain → application → infrastructure → interfaces)
+- Generating Gin HTTP handlers with middleware, validation, and error handling
 - Writing PostgreSQL migrations with JSONB, indexes, and constraints
 - 10 TDD cycles: each cycle generated tests, stub code, then all green
-- Refactoring prompts (extracted config validation, zone whitelist)
-- Test expansion (edge cases, error paths, determinism)
+- Refactoring prompts (extracted config validation, zone whitelist, DTO separation)
+- Test expansion (edge cases, error paths, determinism verification)
+- Full documentation generation across 7 docs (PRD, architecture, security, scalability, domain glossary, test scenarios, API reference)
+- Cloud Run deployment with GitHub Actions CI/CD + workload identity
+- Orchestrating changes across 10+ Go files simultaneously (coordinated edits)
 
 **What I Had to Fix:**
 - Zone surge hardcoded `0.8` instead of parameter → Fixed to use request utilization
@@ -345,8 +349,9 @@ Full documentation available in the `docs/` directory:
 - Rate limiting on admin → Added `Content-Length: 0` for POST requests on Cloud Run
 - `bandung` zone missing → Added to valid zones whitelist
 - Battery discount perspective → Flipped from pickup SoC to return SoC for BSS efficiency
+- Docs drift after code changes → Re-verified all 7 docs after final code changes
 
-**Key Insight:** AI excellent for scaffolding, writing tests, and generating consistent boilerplate. Requires domain expertise review for correctness (DB queries, cryptographic ops, idempotency, business logic). PowerShell vs. curl incompatibility on Windows needs human awareness.
+**Key Insight:** AI is excellent for scaffolding, test generation, and boilerplate. Enables shipping a full-stack project in 72h that would take 2 weeks manually. However, every AI-generated artifact needs domain review: DB queries (parameterization), crypto operations (HMAC correctness), idempotency (migration replays), and business logic alignment. The most valuable skill is knowing what to ask next — AI can generate, but **you** must direct.
 
 **Note:** All code reviewed before commit. No secrets in codebase (keys stored in env vars, excluded PDF).
 
@@ -359,9 +364,25 @@ Full documentation available in the `docs/` directory:
 ## Further Development
 
 With more time:
-- Implement A/B config versioning API (create/activate/compare configs)
-- Real IoT integration (consume actual battery swap events)
-- WebSocket for real-time alerts
-- Grafana dashboard + Prometheus metrics
-- Multi-region Cloud Run deployment with Redis cache
-- Advanced analytics (price elasticity, demand forecasting)
+
+### Near-term (production-hardening)
+- **Battery swap event tracking** — Record swap-in/swap-out events at BSS for accurate return SoC measurement (replaces calculated estimation)
+- **Battery model registry** — Per-vehicle max kWh capacity (currently assumes 1.8 kWh flat)
+- **GCP Secret Manager** — Replace Cloud Run env vars for API keys and HMAC secret
+- **Pagination for audit trail** — `/admin/stats/pricing` returns full table as data grows; add time-range and limit/offset
+- **Price quote locking** — Reserve quote at generation, prevent reuse after 30s TTL
+- **Distributed rate limiting** — Current per-instance limits reset on scale-up; use Redis or Cloud Armor
+
+### Medium-term (feature expansion)
+- **Admin UI dashboard** — Web UI for config management, event creation, fleet visualization
+- **Real IoT integration** — Consume actual battery swap events from BSS stations instead of simulated fleet
+- **A/B config versioning API** — Create/activate/compare configs without migration edits
+- **Concurrent request safety** — Rate-limit-aware quote generation, idempotent event creation
+- **Prometheus + Grafana** — `/metrics` endpoint, dashboards for price trends, latency, error rates
+- **Multi-region Cloud Run** — Deploy to secondary region with Redis cache coherency
+
+### Long-term (platform evolution)
+- **Advanced analytics** — Price elasticity models, demand forecasting, automated config recommendations
+- **Predictive fleet management** — Use historical swap patterns to pre-position charged batteries
+- **Renter-facing app integration** — Push notifications for surge pricing, promo alerts
+- **Dynamic tiers** — Machine-learned loyalty tiers based on usage patterns
