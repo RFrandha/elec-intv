@@ -140,7 +140,8 @@ ON CONFLICT (version) DO UPDATE SET config_jsonb = EXCLUDED.config_jsonb;
 
 -- Seed A/B test mapping: control=version1, variant=version2
 INSERT INTO pricing.ab_test_configs (test_name, segment_name, config_id, is_active)
-VALUES
-  ('default', 'control', (SELECT config_id FROM pricing.pricing_configs WHERE version = 1 LIMIT 1), true),
-  ('default', 'variant', (SELECT config_id FROM pricing.pricing_configs WHERE version = 2 LIMIT 1), true)
-ON CONFLICT DO NOTHING;
+SELECT 'default', 'control', (SELECT config_id FROM pricing.pricing_configs WHERE version = 1 LIMIT 1), true
+WHERE NOT EXISTS (SELECT 1 FROM pricing.ab_test_configs WHERE test_name = 'default' AND segment_name = 'control')
+UNION ALL
+SELECT 'default', 'variant', (SELECT config_id FROM pricing.pricing_configs WHERE version = 2 LIMIT 1), true
+WHERE NOT EXISTS (SELECT 1 FROM pricing.ab_test_configs WHERE test_name = 'default' AND segment_name = 'variant');
