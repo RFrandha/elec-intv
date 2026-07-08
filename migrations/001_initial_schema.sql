@@ -113,7 +113,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Insert default config
 INSERT INTO pricing.pricing_configs (version, config_jsonb, created_by) VALUES
   (1, '{"base_price": 4000, "demand_rules": [{"day_of_week": "weekday", "hour_start": 5, "hour_end": 7, "multiplier": 1.3}, {"day_of_week": "weekday", "hour_start": 0, "hour_end": 5, "multiplier": 0.9}], "zone_surge_thresholds": [{"min_utilization": 0.8, "multiplier": 1.5}, {"min_utilization": 0.5, "multiplier": 1.2}, {"min_utilization": 0.0, "multiplier": 1.0}], "battery_discount_tiers": [{"min_soc": 60.0, "multiplier": 0.80}, {"min_soc": 40.0, "multiplier": 0.90}, {"min_soc": 0.0, "multiplier": 1.0}]}'::jsonb, 'system')
-ON CONFLICT (version) DO NOTHING;
+ON CONFLICT (version) DO UPDATE SET config_jsonb = EXCLUDED.config_jsonb;
 
 -- Set active config
 INSERT INTO pricing.active_config (id, config_id) VALUES (1, 1)
