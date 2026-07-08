@@ -41,7 +41,8 @@ go test -v ./src/tests/
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  HTTP API Layer (Go + Gin)                              │
-│  ├─ GET /api/v1/pricing (public)                        │
+│  ├─ GET /health                                        │
+│  ├─ GET /api/v1/pricing (read-only/admin key)          │
 │  ├─ GET /api/v1/pricing/{quote_id}/breakdown           │
 │  ├─ Admin endpoints (config, events, fleet, analytics) │
 │  └─ Middleware: API key auth, rate limiting             │
@@ -76,24 +77,31 @@ go test -v ./src/tests/
 
 ## API Overview
 
+### Health Check
+
+```bash
+curl -s "https://<host>/health"
+# {"status":"ok"}
+```
+
 ### Pricing Endpoint
 
 **Request:**
 ```bash
-curl -H "X-API-Key: <readonly-key>" \
+curl -H "X-API-Key: <READ_ONLY_API_KEY>" \
   "http://localhost:8080/api/v1/pricing?vehicle_id=V001&zone=jakarta_pusat&duration_hours=0.9"
 ```
 
 **Response:**
 ```json
 {
-  "quote_id": "Q-a1b2c3d4",
+  "quote_id": "550e8400-e29b-41d4-a716-446655440000",
   "vehicle_id": "V001",
   "zone": "jakarta_pusat",
   "kwh_consumed": 0.9,
   "base_rate_per_kwh": 4000,
-  "final_price": 4977,
-  "valid_until": "2026-07-07T10:59:15Z",
+  "final_price": 3240,
+  "valid_until": "2026-07-08T05:53:25Z",
   "ab_segment": "control"
 }
 ```
@@ -107,8 +115,8 @@ curl -H "X-API-Key: <readonly-key>" \
 ### Pricing Breakdown Endpoint
 
 ```bash
-curl -H "X-API-Key: <readonly-key>" \
-  "http://localhost:8080/api/v1/pricing/Q-a1b2c3d4/breakdown"
+curl -H "X-API-Key: <READ_ONLY_API_KEY>" \
+  "http://localhost:8080/api/v1/pricing/550e8400-e29b-41d4-a716-446655440000/breakdown"
 ```
 
 Shows each factor's contribution to final price.
@@ -117,13 +125,13 @@ Shows each factor's contribution to final price.
 
 **Get Current Config:**
 ```bash
-curl -H "X-API-Key: <admin-key>" \
+curl -H "X-API-Key: <ADMIN_API_KEY>" \
   "http://localhost:8080/api/v1/admin/config"
 ```
 
 **Update Config:**
 ```bash
-curl -X PUT -H "X-API-Key: <admin-key>" \
+curl -X PUT -H "X-API-Key: <ADMIN_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
     "base_price": 4500,
@@ -136,7 +144,8 @@ curl -X PUT -H "X-API-Key: <admin-key>" \
 
 **Refresh Config (after update):**
 ```bash
-curl -X POST -H "X-API-Key: <admin-key>" \
+curl -X POST -H "X-API-Key: <ADMIN_API_KEY>" \
+  -H "Content-Length: 0" \
   "http://localhost:8080/api/v1/admin/config/refresh"
 ```
 
@@ -147,16 +156,16 @@ curl -X POST -H "X-API-Key: <admin-key>" \
 - `jakarta_barat` (West Jakarta)
 - `jakarta_timur` (East Jakarta)
 - `jakarta_utara` (North Jakarta)
-- `bogor`, `depok`, `tangerang`, `bekasi` (satellite cities)
+- `bogor`, `depok`, `tangerang`, `bekasi`, `bandung` (satellite cities)
 
 ## Configuration Management
 
 ### Update Config
 ```bash
-curl -X PUT -H "X-API-Key: <admin-key>" \
+curl -X PUT -H "X-API-Key: <ADMIN_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{"base_price": 4500, "demand_rules": [...]}' \
-  "https://<url>/api/v1/admin/config"
+  "https://<host>/api/v1/admin/config"
 ```
 
 ### Manual Refresh (Post-Update)
@@ -164,12 +173,14 @@ After updating config, refresh the in-memory cache manually:
 
 ```bash
 # Refresh config, events, and tiers:
-curl -X POST -H "X-API-Key: <admin-key>" \
-  "https://<url>/api/v1/admin/config/refresh"
+curl -X POST -H "X-API-Key: <ADMIN_API_KEY>" \
+  -H "Content-Length: 0" \
+  "https://<host>/api/v1/admin/config/refresh"
 
 # Refresh fleet state utilization:
-curl -X POST -H "X-API-Key: <admin-key>" \
-  "https://<url>/api/v1/admin/fleet/refresh"
+curl -X POST -H "X-API-Key: <ADMIN_API_KEY>" \
+  -H "Content-Length: 0" \
+  "https://<host>/api/v1/admin/fleet/refresh"
 ```
 
 ### Config Hot-Reload Strategy
@@ -286,23 +297,54 @@ final_price = base_rate_per_kwh
 = 5,963 Rp
 ```
 
+## Documentation
+
+Full documentation available in the `docs/` directory:
+
+| Document | Description |
+|----------|-------------|
+| `PRD.md` | Product Requirements Document — user stories, decisions, scope |
+| `ARCHITECTURE.md` | System design, data flow, database schema, trade-offs |
+| `SECURITY.md` | Authentication, input validation, rate limiting, HMAC audit |
+| `SCALABILITY.md` | Scaling plan, connection pooling, cost projections |
+| `UBIQUITOUS_LANGUAGE.md` | Domain glossary — terms, definitions, relationships |
+| `TEST_SCENARIO.md` | Complete test suite with curl commands and expected responses |
+
 ## AI Tool Usage
 
-**Tools Used:** Claude Code (primary)
+**Model:** 9router/opencode
+
+**Primary CLI:** opencode — interactive agent for software engineering tasks
+
+**Skills (Matt Pocock agentic skills):**
+- `grill-me` — Stress-test architecture decisions before building
+- `to-prd` — Synthesize conversation into PRD
+- `ubiquitous-language` — Extract domain terminology, build UBIQUITOUS_LANGUAGE.md
+- `tdd` — Drive 10 TDD cycles in vertical slices
+- `design-an-interface` — Explore API shape alternatives
+- `domain-modeling` — Sharpen terminology and relationships
 
 **What Worked Well:**
-- Generating boilerplate (HTTP handlers, DB queries, test scaffolds)
-- Refactoring suggestions (identified zone_surge bug, fixed signature)
-- Model type generation from requirements
-- Test case expansion
+- Scaffolding entire DDD project structure (Layered: interfaces → application → infrastructure → domain)
+- Generating Gin HTTP handlers with middleware and validation
+- Writing PostgreSQL migrations with JSONB, indexes, and constraints
+- 10 TDD cycles: each cycle generated tests, stub code, then all green
+- Refactoring prompts (extracted config validation, zone whitelist)
+- Test expansion (edge cases, error paths, determinism)
 
 **What I Had to Fix:**
-- Zone surge calculation: AI hardcoded `0.8` utilization instead of accepting parameter → Fixed to use request parameter
-- Migration ON CONFLICT clauses: AI syntax slightly off for PostgreSQL → Corrected manually
-- HMAC signing: AI used wrong field concatenation order → Verified and corrected
-- Fleet state lookup in handlers: AI didn't fetch from DB → Added explicit query
+- Zone surge hardcoded `0.8` instead of parameter → Fixed to use request utilization
+- Migration ON CONFLICT syntax → Corrected for PostgreSQL dialect
+- Migration idempotency → Changed to `WHERE NOT EXISTS` (Postgres ignores `UNIQUE` on `CREATE TABLE IF NOT EXISTS` when table exists)
+- Quote ID format → Changed from `Q-<hex>` prefix to full UUID (UUID column type)
+- Audit write failing → Added `UserID` to user fallback struct (was empty string)
+- Event creation via curl → `curl.exe` on Windows mangled JSON; used PowerShell `Invoke-WebRequest`
+- Rate limiting on admin → Added `Content-Length: 0` for POST requests on Cloud Run
+- `bandung` zone missing → Added to valid zones whitelist
 
-**Lessons:** AI excellent for scaffolding, needs domain expertise review for correctness (especially DB queries, cryptographic operations).
+**Lessons:** AI excellent for scaffolding, writing tests, and generating consistent boilerplate. Requires domain expertise review for correctness (DB queries, cryptographic ops, idempotency). PowerShell vs. curl incompatibility on Windows needs human awareness.
+
+**Note:** All code reviewed before commit. No secrets in codebase (keys stored in env vars, excluded PDF).
 
 ## What Not Submitted
 

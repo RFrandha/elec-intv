@@ -97,7 +97,9 @@ vehicle_id TEXT PRIMARY KEY,
 zone TEXT NOT NULL,
 current_soc NUMERIC(5,2),                    -- battery state of charge (0-100)
 current_user_id TEXT REFERENCES users(user_id),
-last_swap_timestamp TIMESTAMPTZ
+model TEXT,                                   -- vehicle model (e.g., H1, H3)
+last_swap_timestamp TIMESTAMPTZ,              -- last battery swap
+last_updated TIMESTAMPTZ DEFAULT NOW()
 ```
 
 **`pricing.fleet_state`** — Zone utilization snapshots

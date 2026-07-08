@@ -6,8 +6,10 @@
 
 | Tier | Key | Capabilities | Rate Limit |
 |------|-----|-------------|-----------|
-| **Read-only Key** | `demo-read-only-1234` | Pricing queries, breakdown | 100 req/min per IP |
-| **Admin Key** | `admin-secure-key-5678` | Config management, events, fleet | 10 req/min reads, 1 req/min writes |
+| **Read-only Key** | `<READ_ONLY_API_KEY>` | Pricing queries, breakdown | 100 req/min per IP |
+| **Admin Key** | `<ADMIN_API_KEY>` | Config management, events, fleet | 10 req/min reads, 1 req/min writes |
+
+**Note:** API keys provided separately in onboarding PDF (not in repository).
 
 ### How It Works
 
@@ -18,11 +20,11 @@
 
 ### Key Management (Production Improvements)
 
-Currently stored as environment variables:
+Currently stored as environment variables (for 72h test only):
 ```bash
 # docker-compose.yml or Cloud Run env vars
-ADMIN_API_KEY=admin-secure-key-5678
-READ_ONLY_API_KEY=demo-read-only-1234
+ADMIN_API_KEY=<your-admin-key>
+READ_ONLY_API_KEY=<your-read-only-key>
 ```
 
 **Production improvements:**
@@ -38,16 +40,16 @@ READ_ONLY_API_KEY=demo-read-only-1234
 | Parameter | Validation Rule |
 |-----------|----------------|
 | `vehicle_id` | Must match format `V[0-9]+` (e.g., V001) |
-| `zone` | Must be one of 9 allowed zones (whitelist) |
-| `duration_hours` | Float between 0.1 and 5.0 (max battery capacity 1.8 kWh) |
+| `zone` | Must be one of 10 allowed zones (whitelist) |
+| `duration_hours` | Float between 0.1 and 1.8 (max battery capacity) |
 
 ### Zone Whitelist
 
-Only 9 zones accepted. Any other zone returns 400 Bad Request:
+Only 10 zones accepted. Any other zone returns 400 Bad Request:
 ```
 jakarta_pusat, jakarta_selatan, jakarta_barat,
 jakarta_timur, jakarta_utara, bogor,
-depok, tangerang, bekasi
+depok, tangerang, bekasi, bandung
 ```
 
 ### Request Size Limits
@@ -141,15 +143,15 @@ signature = HMAC-SHA256(quote_id + user_id + vehicle_id + zone + final_price + c
 | Attack Attempt | Result |
 |---------------|--------|
 | SQL injection (`' OR 1=1--`) | Parameterized query rejects |
-| Non-existent vehicle (`V999`) | 404 Not Found |
-| Invalid zone (`xyz123`) | 400 Bad Request (zone whitelist) |
-| Negative kWh (`-1.0`) | 400 Bad Request (bounds check) |
-| Zero kWh (`0`) | 400 Bad Request (bounds check) |
-| Overflow kWh (`9999`) | 400 Bad Request (max 5.0 check) |
-| Missing API key | 401 Unauthorized |
-| Invalid API key | 401 Unauthorized |
-| Rate limit exceeded | 429 Too Many Requests |
-| Admin endpoint with read key | 401 Unauthorized |
+| Non-existent vehicle (`V999`) | `{"error":"vehicle not found"}` |
+| Invalid zone (`xyz123`) | `{"error":"invalid zone"}` |
+| Negative kWh (`-1.0`) | `{"error":"invalid duration_hours: must be 0.1-1.8"}` |
+| Zero kWh (`0`) | `{"error":"invalid duration_hours: must be 0.1-1.8"}` |
+| Overflow kWh (`9999`) | `{"error":"invalid duration_hours: must be 0.1-1.8"}` |
+| Missing API key | `{"error":"unauthorized"}` |
+| Invalid API key | `{"error":"invalid API key"}` |
+| Rate limit exceeded | `{"error":"rate limit exceeded"}` |
+| Admin endpoint with read key | `{"error":"unauthorized, admin key required"}` |
 | CORS preflight (OPTIONS) | 200 OK (no auth required) |
 
 ## TLS/HTTPS
