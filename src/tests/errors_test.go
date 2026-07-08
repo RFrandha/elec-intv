@@ -120,12 +120,19 @@ func TestZones_AllPresent(t *testing.T) {
 	expected := []string{
 		"jakarta_pusat", "jakarta_selatan", "jakarta_barat",
 		"jakarta_timur", "jakarta_utara", "bogor",
-		"depok", "tangerang", "bekasi",
+		"depok", "tangerang", "bekasi", "bandung",
 	}
 
 	for _, z := range expected {
 		if !validZone(z) {
 			t.Errorf("expected zone %q not found", z)
+		}
+	}
+
+	invalid := []string{"surabaya", "  ", "jakarta", ""}
+	for _, z := range invalid {
+		if validZone(z) {
+			t.Errorf("zone %q should NOT be valid", z)
 		}
 	}
 }
@@ -134,7 +141,7 @@ func validZone(zone string) bool {
 	zones := map[string]bool{
 		"jakarta_pusat": true, "jakarta_selatan": true, "jakarta_barat": true,
 		"jakarta_timur": true, "jakarta_utara": true, "bogor": true,
-		"depok": true, "tangerang": true, "bekasi": true,
+		"depok": true, "tangerang": true, "bekasi": true, "bandung": true,
 	}
 	return zones[zone]
 }

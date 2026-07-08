@@ -65,7 +65,7 @@ func (h *Handler) GetPricing(c *gin.Context) {
 	validZones := map[string]bool{
 		"jakarta_pusat": true, "jakarta_selatan": true, "jakarta_barat": true,
 		"jakarta_timur": true, "jakarta_utara": true, "bogor": true,
-		"depok": true, "tangerang": true, "bekasi": true,
+		"depok": true, "tangerang": true, "bekasi": true, "bandung": true,
 	}
 	if !validZones[zone] {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "invalid zone"})
