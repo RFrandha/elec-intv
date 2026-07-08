@@ -311,14 +311,15 @@ Full documentation available in the `docs/` directory:
 | `SCALABILITY.md` | Scaling plan, connection pooling, cost projections |
 | `UBIQUITOUS_LANGUAGE.md` | Domain glossary — terms, definitions, relationships |
 | `TEST_SCENARIO.md` | Complete test suite with curl commands and expected responses |
+| `API_DOCUMENTATION.md` | Full API reference with endpoint docs, examples, and error codes |
 
 ## AI Tool Usage
 
-**Model:** 9router/opencode
+**Tool:** opencode (free tier model)
 
 **Primary CLI:** opencode — interactive agent for software engineering tasks
 
-**Skills (Matt Pocock agentic skills):**
+**Skills Used (Matt Pocock agentic skills):**
 - `grill-me` — Stress-test architecture decisions before building
 - `to-prd` — Synthesize conversation into PRD
 - `ubiquitous-language` — Extract domain terminology, build UBIQUITOUS_LANGUAGE.md
@@ -343,8 +344,9 @@ Full documentation available in the `docs/` directory:
 - Event creation via curl → `curl.exe` on Windows mangled JSON; used PowerShell `Invoke-WebRequest`
 - Rate limiting on admin → Added `Content-Length: 0` for POST requests on Cloud Run
 - `bandung` zone missing → Added to valid zones whitelist
+- Battery discount perspective → Flipped from pickup SoC to return SoC for BSS efficiency
 
-**Lessons:** AI excellent for scaffolding, writing tests, and generating consistent boilerplate. Requires domain expertise review for correctness (DB queries, cryptographic ops, idempotency). PowerShell vs. curl incompatibility on Windows needs human awareness.
+**Key Insight:** AI excellent for scaffolding, writing tests, and generating consistent boilerplate. Requires domain expertise review for correctness (DB queries, cryptographic ops, idempotency, business logic). PowerShell vs. curl incompatibility on Windows needs human awareness.
 
 **Note:** All code reviewed before commit. No secrets in codebase (keys stored in env vars, excluded PDF).
 
